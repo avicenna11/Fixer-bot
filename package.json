@@ -1,13 +1,11 @@
 {
   "name": "fixer-bot",
   "version": "1.0.0",
-  "main": "bot.js",
+  "main": "panel.js",
   "scripts": {
-    "start": "node bot.js",
-    "panel": "node panel.js"
+    "start": "node panel.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "ethers": "^6.7.0"
+    "express": "^4.18.2"
   }
 }
