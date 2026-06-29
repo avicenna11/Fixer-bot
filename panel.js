@@ -31,8 +31,11 @@ app.get("/stop", (req, res) => {
   res.send("Bot Stopped");
 });
 
-app.listen(3000, () => {
-  console.log("PANEL READY → http://localhost:3000");
+// 🔥 مهم‌ترین بخش: پورت Render
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(PANEL READY → Listening on port ${PORT});
 });
 
 module.exports = { botRunning };
