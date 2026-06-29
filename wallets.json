@@ -1,0 +1,9 @@
+[
+  {
+    "address": "0xWallet1",
+    "pk_env": "WALLET1_PK",
+    "quotaFixer": 1000,
+    "dailyPairs": 6,
+    "paused": false
+  }
+]
