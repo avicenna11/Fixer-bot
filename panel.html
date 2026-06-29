@@ -1,1 +1,52 @@
-{\rtf1}
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>Fixer Bot Panel</title>
+    <style>
+        body {
+            background: #111;
+            color: #fff;
+            font-family: Arial;
+            text-align: center;
+            padding-top: 50px;
+        }
+        .box {
+            background: #222;
+            padding: 20px;
+            width: 300px;
+            margin: auto;
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #0af;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h2>پنل ربات FIXER</h2>
+        <p>ربات روی Render اجرا شده</p>
+        <button onclick="checkStatus()">وضعیت ربات</button>
+        <p id="result"></p>
+    </div>
+
+    <script>
+        function checkStatus() {
+            fetch("/status")
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("result").innerText = data.message;
+                });
+        }
+    </script>
+
+</body>
+</html>
