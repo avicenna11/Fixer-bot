@@ -1,9 +1,14 @@
-// FINAL BOT — 48 TX/day — 6 wallets — balance-safe — first TX BUY — 20–40 min spacing
+// FINAL BOT — Aerodrome Pair — FIXER/USDC — 48 TX/day — balance-safe
 
 require("dotenv").config();
 const { ethers } = require("ethers");
 
 const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+
+// TOKENS & PAIR
+const USDC  = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; 
+const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532"; 
+const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 
 // GAS RULE
 const MAX_GAS_ETH = 0.000002;
@@ -22,15 +27,13 @@ const wallets = [
     wallet: new ethers.Wallet(w.pk, provider),
     buys: 0,
     sells: 0,
-    netFixer: 0 // BUY → netFixer+, SELL → netFixer-
+    netFixer: 0
 }));
 
-// Random FIXER amount inside wallet range
 function randomFixerAmount(w) {
     return Math.floor(Math.random() * (w.max - w.min + 1)) + w.min;
 }
 
-// Gas checker
 async function isGasCheapEnough() {
     const fee = await provider.getFeeData();
     const gasPrice = fee.gasPrice || fee.maxFeePerGas;
@@ -39,12 +42,10 @@ async function isGasCheapEnough() {
     return costEth <= MAX_GAS_ETH;
 }
 
-// Random delay 20–40 minutes
 function randomDelayMinutes() {
     return Math.floor(Math.random() * (40 - 20 + 1)) + 20;
 }
 
-// Build schedule for 48 TX over ~24h
 function buildSchedule() {
     const schedule = [];
     let currentTime = Date.now();
@@ -61,49 +62,109 @@ function buildSchedule() {
 let schedule = buildSchedule();
 let pointer  = 0;
 
-// انتخاب کیف‌پول مناسب برای تراکنش بعدی
+// PICK WALLET
 function pickWalletForNextTx() {
     const candidates = wallets.filter(w => w.buys + w.sells < 8);
-
     if (candidates.length === 0) return null;
 
     const possible = candidates.filter(w => {
-        if (w.buys === 0 && w.sells === 0) {
-            return true; // اولین تراکنش → BUY
-        }
-        if (w.netFixer > 0) {
-            return true; // باید SELL کند
-        }
-        if (w.netFixer === 0 && w.buys < 4) {
-            return true; // می‌تواند BUY جدید شروع کند
-        }
+        if (w.buys === 0 && w.sells === 0) return true;
+        if (w.netFixer > 0) return true;
+        if (w.netFixer === 0 && w.buys < 4) return true;
         return false;
     });
 
     if (possible.length === 0) return null;
 
-    const idx = Math.floor(Math.random() * possible.length);
-    return possible[idx];
+    return possible[Math.floor(Math.random() * possible.length)];
 }
 
-// تعیین نوع تراکنش برای کیف‌پول انتخاب‌شده
 function decideActionForWallet(w) {
-    if (w.buys === 0 && w.sells === 0) {
-        return "BUY"; // اولین تراکنش
-    }
-
-    if (w.netFixer > 0) {
-        return "SELL"; // باید بالانس را صفر کند
-    }
-
-    if (w.netFixer === 0 && w.buys < 4) {
-        return "BUY"; // چرخهٔ جدید
-    }
-
+    if (w.buys === 0 && w.sells === 0) return "BUY";
+    if (w.netFixer > 0) return "SELL";
+    if (w.netFixer === 0 && w.buys < 4) return "BUY";
     return null;
 }
 
-// MAIN LOOP — every 20 seconds
+// ===== Aerodrome Pair Logic =====
+
+const PAIR_ABI = [
+    "function getReserves() view returns (uint112,uint112,uint32)",
+    "function token0() view returns (address)",
+    "function token1() view returns (address)",
+    "function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data)"
+];
+
+async function getAmountsOutFromPair(pair, amountIn, tokenIn, tokenOut) {
+    const [r0, r1] = await pair.getReserves();
+    const t0 = await pair.token0();
+    const t1 = await pair.token1();
+
+    let reserveIn, reserveOut;
+
+    if (tokenIn.toLowerCase() === t0.toLowerCase()) {
+        reserveIn  = r0;
+        reserveOut = r1;
+    } else {
+        reserveIn  = r1;
+        reserveOut = r0;
+    }
+
+    return (BigInt(amountIn) * BigInt(reserveOut)) / BigInt(reserveIn);
+}
+
+async function buyFixer(wallet, amountFixer) {
+    const pair = new ethers.Contract(AERO_PAIR, PAIR_ABI, wallet);
+
+    const t0 = await pair.token0();
+    const t1 = await pair.token1();
+
+    let amount0Out = 0n;
+    let amount1Out = 0n;
+
+    if (t0.toLowerCase() === FIXER.toLowerCase()) {
+        amount0Out = BigInt(amountFixer);
+    } else {
+        amount1Out = BigInt(amountFixer);
+    }
+
+    const tx = await pair.swap(
+        amount0Out,
+        amount1Out,
+        wallet.address,
+        "0x",
+        { gasLimit: GAS_LIMIT }
+    );
+    async function sellFixer(wallet, amountFixer) {
+    const pair = new ethers.Contract(AERO_PAIR, PAIR_ABI, wallet);
+
+    const amountOutUSDC = await getAmountsOutFromPair(pair, amountFixer, FIXER, USDC);
+
+    const t0 = await pair.token0();
+    const t1 = await pair.token1();
+
+    let amount0Out = 0n;
+    let amount1Out = 0n;
+
+    if (t0.toLowerCase() === USDC.toLowerCase()) {
+        amount0Out = BigInt(amountOutUSDC);
+    } else {
+        amount1Out = BigInt(amountOutUSDC);
+    }
+
+    const tx = await pair.swap(
+        amount0Out,
+        amount1Out,
+        wallet.address,
+        "0x",
+        { gasLimit: GAS_LIMIT }
+    );
+
+    await tx.wait();
+    console.log(🔴 SELL ${amountFixer} FIXER | ${wallet.address});
+}
+
+// MAIN LOOP
 setInterval(async () => {
     const now = Date.now();
 
@@ -143,28 +204,42 @@ setInterval(async () => {
 
     if (action === "SELL" && w.netFixer > 0) {
         if (w.sells === 3) {
-            amount = w.netFixer; // صفر کردن بالانس
+            amount = w.netFixer;
         } else if (amount > w.netFixer) {
-          console.log(
+            amount = w.netFixer;
+        }
+    }
+
+    console.log(
         🚀 TX #${pointer+1} | ${w.name} → ${action} ${amount} FIXER | netFixer(before)=${w.netFixer}
     );
 
-    if (action === "BUY") {
-        w.buys++;
-        w.netFixer += amount;
-    } else {
-        w.sells++;
-        w.netFixer -= amount;
-        if (w.netFixer < 0) w.netFixer = 0;
-    }
+    try {
+        if (action === "BUY") {
+            await buyFixer(w.wallet, amount);
+            w.buys++;
+            w.netFixer += amount;
+        } else {
+            await sellFixer(w.wallet, amount);
+            w.sells++;
+            w.netFixer -= amount;
+            if (w.netFixer < 0) w.netFixer = 0;
+        }
 
-    console.log(   ➜ netFixer(after)=${w.netFixer}, buys=${w.buys}, sells=${w.sells});
+        console.log(
+               ➜ netFixer(after)=${w.netFixer}, buys=${w.buys}, sells=${w.sells}
+        );
+    } catch (e) {
+        console.log(❌ TX failed for ${w.name}: ${e.message});
+    }
 
     pointer++;
 
 }, 20 * 1000);
 
-console.log("🚀 BOT READY — first TX BUY, balance-safe, random wallets, 48 TX/day, 20–40 min spacing");
-            amount = w.netFixer;
-        }
-    }
+console.log("🚀 BOT READY — Aerodrome FIXER/USDC — 48 TX/day — balance-safe — first TX BUY");
+
+
+    await tx.wait();
+    console.log(🟢 BUY ${amountFixer} FIXER | ${wallet.address});
+}
