@@ -1,26 +1,38 @@
 const express = require("express");
-const path = require("path");
+const fs = require("fs");
+
 const app = express();
-
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.static("."));
 
-// سرو کردن فایل‌های استاتیک مثل panel.html
-app.use(express.static(path.join(__dirname)));
+let botRunning = false;
 
-// صفحه اصلی پنل
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "panel.html"));
+  res.sendFile(__dirname + "/panel.html");
 });
 
-// API ساده برای تست
-app.get("/status", (req, res) => {
-    res.json({ ok: true, message: "Panel is running" });
+app.post("/save", (req, res) => {
+  const newSettings = req.body;
+  const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
+
+  const merged = { ...oldSettings, ...newSettings };
+  fs.writeFileSync("settings.json", JSON.stringify(merged, null, 2));
+
+  res.send("OK");
 });
 
-// پورت Render
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, () => {
-    console.log("Panel running on port " + PORT);
+app.get("/start", (req, res) => {
+  botRunning = true;
+  res.send("Bot Started");
 });
+
+app.get("/stop", (req, res) => {
+  botRunning = false;
+  res.send("Bot Stopped");
+});
+
+app.listen(3000, () => {
+  console.log("PANEL READY → http://localhost:3000");
+});
+
+module.exports = { botRunning };
