@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {
   "name": "fixer-bot",
   "version": "1.0.0",
@@ -11,17 +10,3 @@
     "express": "^4.18.2"
   }
 }
-=======
-{
-  "name": "fixer-bot",
-  "version": "1.0.0",
-  "main": "bot.js",
-  "scripts": {
-    "start": "node bot.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "dotenv": "^16.0.0"
-  }
-}
->>>>>>> a79dfbfb5c06e37daad31055911005f1aab0a228
