@@ -203,9 +203,4 @@ setInterval(async () => {
 }, 20000);
 
 console.log("BOT READY → Listening on port", PORT);
-
-<<<<<<< HEAD
 app.listen(PORT);
-=======
-app.listen(PORT);
->>>>>>> a79dfbfb5c06e37daad31055911005f1aab0a228
