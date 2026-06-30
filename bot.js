@@ -23,15 +23,18 @@ function loadSettings() {
 // ⭐ فقط از 6 کیف پول ENV می‌خواند
 function buildWallets() {
   const s = loadSettings();
-
   const walletNames = Object.keys(s.wallet_ranges); // ["W1","W2","W3","W4","W5","W6"]
+
+  console.log("=== ENV CHECK ===");
+  walletNames.forEach(n => console.log(n, "=", process.env[n]));
 
   return walletNames.map(name => {
     const [min, max] = s.wallet_ranges[name];
-    const pk = process.env[name];   // کلید خصوصی از ENV
+    const pk = process.env[name];
 
     if (!pk || !pk.startsWith("0x") || pk.length !== 66) {
       console.error(`❌ Private key for ${name} is invalid or missing`);
+      return null;  // جلوگیری از کرش
     }
 
     return {
@@ -44,7 +47,7 @@ function buildWallets() {
       sells: 0,
       netFixer: 0
     };
-  });
+  }).filter(Boolean); // حذف null ها
 }
 
 let wallets = buildWallets();
