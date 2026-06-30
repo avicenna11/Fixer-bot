@@ -35,7 +35,7 @@ app.get("/stop", (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(PANEL READY → Listening on port ${PORT});
+  console.log(`PANEL READY → Listening on port ${PORT}`);
 });
 
-module.exports = { botRunning };{\rtf1}
+module.exports = { botRunning };
