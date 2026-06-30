@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 10000;
 
 const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
 
-const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const USDC = "0x833589fCD6eDb6e08f4c7C32D4f71b54bdA02913";
 const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532";
 const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 
@@ -20,21 +20,36 @@ function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
 }
 
-// کیف‌ پول‌ها داینامیک از settings.json + ENV
+// ⭐ نسخهٔ نهایی: مپ بین W1/W2/... و WALLET1_PK/WALLET2_PK/...
 function buildWallets() {
   const s = loadSettings();
 
   const walletNames = Object.keys(s.wallet_ranges);
 
+  // مپ اسم‌های settings.json → اسم‌های واقعی ENV
+  const envMap = {
+    W1: "WALLET1_PK",
+    W2: "WALLET2_PK",
+    W3: "WALLET3_PK",
+    W4: "WALLET4_PK",
+    W5: "WALLET5_PK",
+    W6: "WALLET6_PK"
+  };
+
   console.log("=== ENV CHECK ===");
-  walletNames.forEach(n => console.log(n, "=", process.env[n]));
+  walletNames.forEach(n => {
+    const envName = envMap[n] || n;
+    console.log(`${n} → ${envName} = ${process.env[envName]}`);
+  });
 
   return walletNames.map(name => {
     const [min, max] = s.wallet_ranges[name];
-    const pk = process.env[name];
+
+    const envName = envMap[name] || name;
+    const pk = process.env[envName];
 
     if (!pk || !pk.startsWith("0x") || pk.length !== 66) {
-      console.error(`❌ Private key for ${name} is invalid or missing`);
+      console.error(`❌ Private key for ${name} (ENV: ${envName}) is invalid or missing`);
       return null;
     }
 
