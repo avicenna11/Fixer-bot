@@ -1,16 +1,20 @@
 require("dotenv").config();
 const { ethers } = require("ethers");
 const fs = require("fs");
+const express = require("express");
 const { botRunning } = require("./panel");
+
+const app = express();
+const PORT = process.env.PORT || 10000;
 
 const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
 
-const USDC  = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532";
 const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 
 const MAX_GAS_ETH = 0.000002;
-const GAS_LIMIT   = 180000n;
+const GAS_LIMIT = 180000n;
 
 function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
@@ -61,7 +65,7 @@ function buildSchedule() {
 }
 
 let schedule = buildSchedule();
-let pointer  = 0;
+let pointer = 0;
 
 function pickWalletForNextTx() {
   const candidates = wallets.filter(w => w.buys + w.sells < 8);
@@ -101,10 +105,10 @@ async function getAmountsOutFromPair(pair, amountIn, tokenIn, tokenOut) {
   let reserveIn, reserveOut;
 
   if (tokenIn.toLowerCase() === t0.toLowerCase()) {
-    reserveIn  = r0;
+    reserveIn = r0;
     reserveOut = r1;
   } else {
-    reserveIn  = r1;
+    reserveIn = r1;
     reserveOut = r0;
   }
 
@@ -144,7 +148,10 @@ async function sellFixer(wallet, amountFixer) {
   if (t0.toLowerCase() === USDC.toLowerCase()) {
     amount0Out = BigInt(amountOutUSDC);
   } else {
-      const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", { gasLimit: GAS_LIMIT });
+    amount1Out = BigInt(amountOutUSDC);
+  }
+
+  const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", { gasLimit: GAS_LIMIT });
   await tx.wait();
 }
 
@@ -156,7 +163,7 @@ setInterval(async () => {
   if (pointer >= schedule.length) {
     wallets = buildWallets();
     schedule = buildSchedule();
-    pointer  = 0;
+    pointer = 0;
     return;
   }
 
@@ -195,6 +202,6 @@ setInterval(async () => {
 
 }, 20000);
 
-console.log("BOT READY + PANEL READY");
-    amount1Out = BigInt(amountOutUSDC);
-  }
+console.log("BOT READY → Listening on port", PORT);
+
+app.listen(PORT);
