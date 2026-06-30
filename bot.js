@@ -20,10 +20,11 @@ function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
 }
 
-// ⭐ فقط از 6 کیف پول ENV می‌خواند
+// کیف‌ پول‌ها داینامیک از settings.json + ENV
 function buildWallets() {
   const s = loadSettings();
-  const walletNames = Object.keys(s.wallet_ranges); // ["W1","W2","W3","W4","W5","W6"]
+
+  const walletNames = Object.keys(s.wallet_ranges);
 
   console.log("=== ENV CHECK ===");
   walletNames.forEach(n => console.log(n, "=", process.env[n]));
@@ -34,7 +35,7 @@ function buildWallets() {
 
     if (!pk || !pk.startsWith("0x") || pk.length !== 66) {
       console.error(`❌ Private key for ${name} is invalid or missing`);
-      return null;  // جلوگیری از کرش
+      return null;
     }
 
     return {
@@ -47,7 +48,7 @@ function buildWallets() {
       sells: 0,
       netFixer: 0
     };
-  }).filter(Boolean); // حذف null ها
+  }).filter(Boolean);
 }
 
 let wallets = buildWallets();
