@@ -20,16 +20,26 @@ function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
 }
 
+// ⭐ فقط از 6 کیف پول ENV می‌خواند
 function buildWallets() {
   const s = loadSettings();
-  return Object.keys(s.wallet_ranges).map(name => {
+
+  const walletNames = Object.keys(s.wallet_ranges); // ["W1","W2","W3","W4","W5","W6"]
+
+  return walletNames.map(name => {
     const [min, max] = s.wallet_ranges[name];
+    const pk = process.env[name];   // کلید خصوصی از ENV
+
+    if (!pk || !pk.startsWith("0x") || pk.length !== 66) {
+      console.error(`❌ Private key for ${name} is invalid or missing`);
+    }
+
     return {
       name,
       min,
       max,
-      pk: process.env[name],
-      wallet: new ethers.Wallet(process.env[name], provider),
+      pk,
+      wallet: new ethers.Wallet(pk, provider),
       buys: 0,
       sells: 0,
       netFixer: 0
