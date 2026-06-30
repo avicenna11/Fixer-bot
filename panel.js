@@ -10,7 +10,7 @@ let botRunning = false;
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/panel.html");
 });
-h
+
 app.post("/save", (req, res) => {
   const newSettings = req.body;
   const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
