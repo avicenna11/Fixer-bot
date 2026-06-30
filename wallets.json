@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 [
   {
     "address": "0xWallet1",
@@ -6,4 +7,14 @@
     "dailyPairs": 6,
     "paused": false
   }
+=======
+[
+  {
+    "address": "0xWallet1",
+    "pk_env": "WALLET1_PK",
+    "quotaFixer": 1000,
+    "dailyPairs": 6,
+    "paused": false
+  }
+>>>>>>> a79dfbfb5c06e37daad31055911005f1aab0a228
 ]
