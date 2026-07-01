@@ -2,14 +2,17 @@ require("dotenv").config();
 const { ethers } = require("ethers");
 const fs = require("fs");
 const express = require("express");
-const { botRunning } = require("./panel");
 
 const app = express();
+app.use(express.json());
+
+let botRunning = false;   // ⭐ جایگزین require("./panel")
+
 const PORT = process.env.PORT || 10000;
 
 const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
 
-const USDC = "0x833589fCD6eDb6e08f4c7C32D4f71b54bdA02913";
+const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532";
 const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 
@@ -26,7 +29,6 @@ function buildWallets() {
 
   const walletNames = Object.keys(s.wallet_ranges);
 
-  // مپ اسم‌های settings.json → اسم‌های واقعی ENV
   const envMap = {
     W1: "WALLET1_PK",
     W2: "WALLET2_PK",
@@ -230,6 +232,25 @@ setInterval(async () => {
   pointer++;
 
 }, 20000);
+
+// ⭐ APIهای پنل
+app.get("/start", (req, res) => {
+  botRunning = true;
+  res.send("Bot Started");
+});
+
+app.get("/stop", (req, res) => {
+  botRunning = false;
+  res.send("Bot Stopped");
+});
+
+app.post("/save", (req, res) => {
+  const newSettings = req.body;
+  const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
+  const merged = { ...oldSettings, ...newSettings };
+  fs.writeFileSync("settings.json", JSON.stringify(merged, null, 2));
+  res.send("OK");
+});
 
 console.log("BOT READY → Listening on port", PORT);
 app.listen(PORT);
