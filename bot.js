@@ -18,7 +18,7 @@ const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532";
 const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 
-const MAX_GAS_ETH = 0.000002;   // برای تست می‌تونی موقتاً بزرگ‌ترش کنی
+const MAX_GAS_ETH = 0.000002;
 const GAS_LIMIT = 180000n;
 
 function loadSettings() {
@@ -321,11 +321,10 @@ setInterval(async () => {
 
 }, 20000);
 
-// APIها
+// ⭐ نسخهٔ اصلاح‌شدهٔ START
 app.get("/start", (req, res) => {
   console.log("/start received");
 
-  // هر بار استارت → ولت‌ها و Schedule از صفر ساخته می‌شن
   wallets = buildWallets();
   schedule = buildSchedule();
   pointer = 0;
@@ -335,17 +334,7 @@ app.get("/start", (req, res) => {
   res.json({ status: "started" });
 });
 
-app.get("/stop", (req, res) => {
-  console.log("/stop received");
-  botRunning = false;
-  console.log("Bot Stopped");
-  res.json({ status: "stopped" });
-});
-
-app.get("/save", (req, res) => {
-  res.json({ status: "use POST" });
-});
-
+// ⭐ نسخهٔ اصلاح‌شدهٔ SAVE
 app.post("/save", (req, res) => {
   const newSettings = req.body;
   const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
@@ -353,11 +342,17 @@ app.post("/save", (req, res) => {
   fs.writeFileSync("settings.json", JSON.stringify(merged, null, 2));
   console.log("Settings updated:", merged);
 
-  // بعد از تغییر تنظیمات، Schedule هم ریست می‌شه
   schedule = buildSchedule();
   pointer = 0;
 
   res.json({ status: "saved" });
+});
+
+app.get("/stop", (req, res) => {
+  console.log("/stop received");
+  botRunning = false;
+  console.log("Bot Stopped");
+  res.json({ status: "stopped" });
 });
 
 console.log("BOT READY → Listening on port", PORT);
