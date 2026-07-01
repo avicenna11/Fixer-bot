@@ -2,10 +2,10 @@ require("dotenv").config();
 const { ethers } = require("ethers");
 const fs = require("fs");
 const express = require("express");
-const cors = require("cors");          // ⭐ اضافه شد
+const cors = require("cors");
 
 const app = express();
-app.use(cors());                       // ⭐ اجازه به پنل برای درخواست‌ها
+app.use(cors());
 app.use(express.json());
 
 let botRunning = false;
@@ -232,20 +232,19 @@ setInterval(async () => {
 
 }, 20000);
 
-// ⭐ APIهای پنل
+// ⭐ APIهای پنل — نسخهٔ نهایی با JSON
 app.get("/start", (req, res) => {
   botRunning = true;
-  res.send("Bot Started");
+  res.json({ status: "started" });
 });
 
 app.get("/stop", (req, res) => {
   botRunning = false;
-  res.send("Bot Stopped");
+  res.json({ status: "stopped" });
 });
 
-// ⭐ /save → هم GET هم POST
 app.get("/save", (req, res) => {
-  res.send("Use POST /save with JSON body");
+  res.json({ status: "use POST" });
 });
 
 app.post("/save", (req, res) => {
@@ -253,7 +252,7 @@ app.post("/save", (req, res) => {
   const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
   const merged = { ...oldSettings, ...newSettings };
   fs.writeFileSync("settings.json", JSON.stringify(merged, null, 2));
-  res.send("OK");
+  res.json({ status: "saved" });
 });
 
 console.log("BOT READY → Listening on port", PORT);
