@@ -232,14 +232,18 @@ setInterval(async () => {
 
 }, 20000);
 
-// ⭐ APIهای پنل — نسخهٔ نهایی با JSON
+// ⭐ نسخهٔ نهایی APIها با لاگ کامل
 app.get("/start", (req, res) => {
+  console.log("/start received");
   botRunning = true;
+  console.log("Bot Started");
   res.json({ status: "started" });
 });
 
 app.get("/stop", (req, res) => {
+  console.log("/stop received");
   botRunning = false;
+  console.log("Bot Stopped");
   res.json({ status: "stopped" });
 });
 
@@ -252,6 +256,7 @@ app.post("/save", (req, res) => {
   const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
   const merged = { ...oldSettings, ...newSettings };
   fs.writeFileSync("settings.json", JSON.stringify(merged, null, 2));
+  console.log("Settings updated:", merged);
   res.json({ status: "saved" });
 });
 
