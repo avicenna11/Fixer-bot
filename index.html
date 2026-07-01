@@ -5,8 +5,8 @@
   <title>FIXER BOT PANEL</title>
   <style>
     body { background:#111; color:#eee; font-family:Arial; padding:20px; }
-    button { padding:10px 20px; margin:10px; font-size:16px; }
-    input { padding:8px; margin:5px; width:80px; }
+    button { padding:10px 20px; margin:10px; font-size:16px; cursor:pointer; }
+    input { padding:8px; margin:5px; width:100px; }
     .box { background:#222; padding:20px; margin-top:20px; border-radius:10px; }
   </style>
 </head>
@@ -16,8 +16,8 @@
 
 <div class="box">
   <h2>Bot Controls</h2>
-  <button onclick="fetch('/start')">Start Bot</button>
-  <button onclick="fetch('/stop')">Stop Bot</button>
+  <button onclick="startBot()">Start Bot</button>
+  <button onclick="stopBot()">Stop Bot</button>
 </div>
 
 <div class="box">
@@ -25,16 +25,30 @@
   <label>TX/day:</label>
   <input id="tx" type="number"><br>
 
-  <label>Min Delay:</label>
+  <label>Min Delay (sec):</label>
   <input id="min" type="number"><br>
 
-  <label>Max Delay:</label>
+  <label>Max Delay (sec):</label>
   <input id="max" type="number"><br>
 
   <button onclick="save()">Save Settings</button>
 </div>
 
 <script>
+const API_URL = "https://fixer-bot-d7sw.onrender.com";
+
+function startBot() {
+  fetch(API_URL + "/start")
+    .then(r => console.log("Start sent"))
+    .catch(e => console.error(e));
+}
+
+function stopBot() {
+  fetch(API_URL + "/stop")
+    .then(r => console.log("Stop sent"))
+    .catch(e => console.error(e));
+}
+
 function save() {
   const data = {
     tx_per_day: Number(document.getElementById("tx").value),
@@ -42,11 +56,13 @@ function save() {
     max_delay: Number(document.getElementById("max").value)
   };
 
-  fetch('/save', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(data)
-  });
+  fetch(API_URL + "/save", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(data)
+  })
+  .then(r => console.log("Settings saved"))
+  .catch(e => console.error(e));
 }
 </script>
 
