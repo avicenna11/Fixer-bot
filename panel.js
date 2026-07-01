@@ -38,4 +38,4 @@ app.listen(PORT, () => {
   console.log(`PANEL READY → Listening on port ${PORT}`);
 });
 
-module.exports = { botRunning };
+module.exports 
