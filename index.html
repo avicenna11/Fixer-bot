@@ -37,16 +37,19 @@
 <script>
 const API_URL = "https://fixer-bot-d7sw.onrender.com";
 
+// ⭐ نسخهٔ جدید با JSON
 function startBot() {
   fetch(API_URL + "/start")
-    .then(r => console.log("Start sent"))
-    .catch(e => console.error(e));
+    .then(r => r.json())
+    .then(data => console.log("Start:", data))
+    .catch(e => console.error("Start Error:", e));
 }
 
 function stopBot() {
   fetch(API_URL + "/stop")
-    .then(r => console.log("Stop sent"))
-    .catch(e => console.error(e));
+    .then(r => r.json())
+    .then(data => console.log("Stop:", data))
+    .catch(e => console.error("Stop Error:", e));
 }
 
 function save() {
@@ -61,8 +64,9 @@ function save() {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(data)
   })
-  .then(r => console.log("Settings saved"))
-  .catch(e => console.error(e));
+  .then(r => r.json())
+  .then(data => console.log("Save:", data))
+  .catch(e => console.error("Save Error:", e));
 }
 </script>
 
