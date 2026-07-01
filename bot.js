@@ -6,7 +6,7 @@ const express = require("express");
 const app = express();
 app.use(express.json());
 
-let botRunning = false;   // ⭐ جایگزین require("./panel")
+let botRunning = false;
 
 const PORT = process.env.PORT || 10000;
 
@@ -23,10 +23,8 @@ function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
 }
 
-// ⭐ نسخهٔ نهایی: مپ بین W1/W2/... و WALLET1_PK/WALLET2_PK/...
 function buildWallets() {
   const s = loadSettings();
-
   const walletNames = Object.keys(s.wallet_ranges);
 
   const envMap = {
@@ -40,14 +38,13 @@ function buildWallets() {
 
   console.log("=== ENV CHECK ===");
   walletNames.forEach(n => {
-    const envName = envMap[n] || n;
+    const envName = envMap[n];
     console.log(`${n} → ${envName} = ${process.env[envName]}`);
   });
 
   return walletNames.map(name => {
     const [min, max] = s.wallet_ranges[name];
-
-    const envName = envMap[name] || name;
+    const envName = envMap[name];
     const pk = process.env[envName];
 
     if (!pk || !pk.startsWith("0x") || pk.length !== 66) {
@@ -242,6 +239,11 @@ app.get("/start", (req, res) => {
 app.get("/stop", (req, res) => {
   botRunning = false;
   res.send("Bot Stopped");
+});
+
+// ⭐ نسخهٔ اصلاح‌شدهٔ /save → هم GET هم POST
+app.get("/save", (req, res) => {
+  res.send("Use POST /save with JSON body");
 });
 
 app.post("/save", (req, res) => {
