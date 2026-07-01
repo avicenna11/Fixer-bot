@@ -2,8 +2,10 @@ require("dotenv").config();
 const { ethers } = require("ethers");
 const fs = require("fs");
 const express = require("express");
+const cors = require("cors");          // ⭐ اضافه شد
 
 const app = express();
+app.use(cors());                       // ⭐ اجازه به پنل برای درخواست‌ها
 app.use(express.json());
 
 let botRunning = false;
@@ -241,7 +243,7 @@ app.get("/stop", (req, res) => {
   res.send("Bot Stopped");
 });
 
-// ⭐ نسخهٔ اصلاح‌شدهٔ /save → هم GET هم POST
+// ⭐ /save → هم GET هم POST
 app.get("/save", (req, res) => {
   res.send("Use POST /save with JSON body");
 });
