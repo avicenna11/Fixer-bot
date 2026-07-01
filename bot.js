@@ -18,8 +18,8 @@ const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532";
 const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 
-const MAX_GAS_ETH = 0.00002;   // برای تست می‌تونی موقتاً بزرگ‌ترش کنی
-const GAS_LIMIT = 1800000n;
+const MAX_GAS_ETH = 0.000002;   // برای تست می‌تونی موقتاً بزرگ‌ترش کنی
+const GAS_LIMIT = 180000n;
 
 function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
@@ -324,8 +324,14 @@ setInterval(async () => {
 // APIها
 app.get("/start", (req, res) => {
   console.log("/start received");
+
+  // هر بار استارت → ولت‌ها و Schedule از صفر ساخته می‌شن
+  wallets = buildWallets();
+  schedule = buildSchedule();
+  pointer = 0;
+
   botRunning = true;
-  console.log("Bot Started");
+  console.log("Bot Started with fresh schedule");
   res.json({ status: "started" });
 });
 
@@ -346,6 +352,11 @@ app.post("/save", (req, res) => {
   const merged = { ...oldSettings, ...newSettings };
   fs.writeFileSync("settings.json", JSON.stringify(merged, null, 2));
   console.log("Settings updated:", merged);
+
+  // بعد از تغییر تنظیمات، Schedule هم ریست می‌شه
+  schedule = buildSchedule();
+  pointer = 0;
+
   res.json({ status: "saved" });
 });
 
