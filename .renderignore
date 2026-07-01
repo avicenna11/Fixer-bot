@@ -1,3 +1,10 @@
+<<<<<<< HEAD
 git add .renderignore
 git commit -m "fix renderignore"
 git push
+=======
+panel.js
+index.html
+panel.html
+panel.css
+>>>>>>> f504ea3210d83d3c027e63a0e60ef92a4dcc37ba

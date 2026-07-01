@@ -31,8 +31,8 @@ app.get("/stop", (req, res) => {
   res.send("Bot Stopped");
 });
 
-// پورت درست برای Render
-const PORT = process.env.PORT || 3000;
+// پورت جدا برای پنل
+const PORT = process.env.PANEL_PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`PANEL READY → Listening on port ${PORT}`);
