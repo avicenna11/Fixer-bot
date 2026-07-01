@@ -18,8 +18,8 @@ const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532";
 const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 
-const MAX_GAS_ETH = 0.0001;   // برای تست می‌تونی موقتاً بزرگ‌ترش کنی
-const GAS_LIMIT = 180000n;
+const MAX_GAS_ETH = 0.00002;   // برای تست می‌تونی موقتاً بزرگ‌ترش کنی
+const GAS_LIMIT = 1800000n;
 
 function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
