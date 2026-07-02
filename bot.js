@@ -11,9 +11,9 @@ app.use(express.json());
 let botRunning = false;
 
 const PORT = process.env.PORT || 10000;
-
 const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
 
+// توکن‌ها و جفت
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const FIXER = "0x8C3206F89f903638AC74DEEdD9DDC06F0c59C532";
 const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
@@ -29,6 +29,15 @@ const ERC20_ABI = [
   "function allowance(address owner, address spender) view returns (uint256)",
   "function decimals() view returns (uint8)"
 ];
+
+const PAIR_ABI = [
+  "function getReserves() view returns (uint112,uint112,uint32)",
+  "function token0() view returns (address)",
+  "function token1() view returns (address)",
+  "function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data)"
+];
+
+// ---------- Settings & Wallets ----------
 
 function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
@@ -53,40 +62,44 @@ function buildWallets() {
     console.log(`${n} → ${envName} = ${process.env[envName]}`);
   });
 
-  const built = walletNames.map(name => {
-    const [min, max] = s.wallet_ranges[name];
-    const envName = envMap[name];
-    const pk = process.env[envName];
+  const built = walletNames
+    .map(name => {
+      const [min, max] = s.wallet_ranges[name];
+      const envName = envMap[name];
+      const pk = process.env[envName];
 
-    if (!pk || !pk.startsWith("0x") || pk.length !== 66) {
-      console.error(`❌ Private key for ${name} (ENV: ${envName}) is invalid or missing`);
-      return null;
-    }
+      if (!pk || !pk.startsWith("0x") || pk.length !== 66) {
+        console.error(`❌ Private key for ${name} (ENV: ${envName}) is invalid or missing`);
+        return null;
+      }
 
-    try {
-      const wallet = new ethers.Wallet(pk, provider);
-      console.log(`✅ Wallet built for ${name}: ${wallet.address}`);
-      return {
-        name,
-        min,
-        max,
-        pk,
-        wallet,
-        buys: 0,
-        sells: 0,
-        netFixer: 0
-      };
-    } catch (e) {
-      console.error(`❌ Failed to build wallet for ${name}:`, e);
-      return null;
-    }
-  }).filter(Boolean);
+      try {
+        const wallet = new ethers.Wallet(pk, provider);
+        console.log(`✅ Wallet built for ${name}: ${wallet.address}`);
+        return {
+          name,
+          min,
+          max,
+          pk,
+          wallet,
+          buys: 0,
+          sells: 0,
+          netFixer: 0
+        };
+      } catch (e) {
+        console.error(`❌ Failed to build wallet for ${name}:`, e);
+        return null;
+      }
+    })
+    .filter(Boolean);
 
   console.log("Total active wallets:", built.length);
   return built;
 }
 
 let wallets = buildWallets();
+
+// ---------- Helpers ----------
 
 function randomFixerAmount(w) {
   return Math.floor(Math.random() * (w.max - w.min + 1)) + w.min;
@@ -119,13 +132,17 @@ function buildSchedule() {
   });
 
   for (let i = 0; i < s.tx_per_day; i++) {
-    const delayMinutes = Math.floor(Math.random() * (s.max_delay - s.min_delay + 1)) + s.min_delay;
+    const delayMinutes =
+      Math.floor(Math.random() * (s.max_delay - s.min_delay + 1)) + s.min_delay;
     const delay = delayMinutes * 60 * 1000;
     currentTime += delay;
     schedule.push(currentTime);
   }
 
-  console.log("Schedule built, first 5 entries:", schedule.slice(0, 5).map(t => new Date(t).toISOString()));
+  console.log(
+    "Schedule built, first 5 entries:",
+    schedule.slice(0, 5).map(t => new Date(t).toISOString())
+  );
   return schedule;
 }
 
@@ -152,7 +169,16 @@ function pickWalletForNextTx() {
   }
 
   const chosen = possible[Math.floor(Math.random() * possible.length)];
-  console.log("Wallet chosen for next tx:", chosen.name, "buys:", chosen.buys, "sells:", chosen.sells, "netFixer:", chosen.netFixer);
+  console.log(
+    "Wallet chosen for next tx:",
+    chosen.name,
+    "buys:",
+    chosen.buys,
+    "sells:",
+    chosen.sells,
+    "netFixer:",
+    chosen.netFixer
+  );
   return chosen;
 }
 
@@ -163,17 +189,18 @@ function decideActionForWallet(w) {
   return null;
 }
 
-const PAIR_ABI = [
-  "function getReserves() view returns (uint112,uint112,uint32)",
-  "function token0() view returns (address)",
-  "function token1() view returns (address)",
-  "function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data)"
-];
+// ---------- AMM math ----------
 
-async function getAmountsOutFromPair(pair, amountIn, tokenIn, tokenOut) {
+async function getReservesAndTokens(pair) {
   const [r0, r1] = await pair.getReserves();
   const t0 = await pair.token0();
   const t1 = await pair.token1();
+  return { r0, r1, t0, t1 };
+}
+
+// amountOut = amountIn * reserveOut / reserveIn
+async function getAmountsOutFromPair(pair, amountIn, tokenIn, tokenOut) {
+  const { r0, r1, t0, t1 } = await getReservesAndTokens(pair);
 
   let reserveIn, reserveOut;
 
@@ -195,7 +222,33 @@ async function getAmountsOutFromPair(pair, amountIn, tokenIn, tokenOut) {
   return out;
 }
 
-// ⭐ خرید FIXER با USDC (ورودی = USDC، خروجی = FIXER)
+// amountIn = amountOut * reserveIn / reserveOut
+async function getAmountsInFromPair(pair, amountOut, tokenIn, tokenOut) {
+  const { r0, r1, t0, t1 } = await getReservesAndTokens(pair);
+
+  let reserveIn, reserveOut;
+
+  if (tokenIn.toLowerCase() === t0.toLowerCase()) {
+    reserveIn = r0;
+    reserveOut = r1;
+  } else {
+    reserveIn = r1;
+    reserveOut = r0;
+  }
+
+  const amountIn = (BigInt(amountOut) * BigInt(reserveIn)) / BigInt(reserveOut);
+  console.log("getAmountsInFromPair:", {
+    amountOut: amountOut.toString(),
+    reserveIn: reserveIn.toString(),
+    reserveOut: reserveOut.toString(),
+    amountIn: amountIn.toString()
+  });
+  return amountIn;
+}
+
+// ---------- BUY / SELL ----------
+
+// BUY: ورودی USDC، خروجی FIXER
 async function buyFixer(wallet, amountFixer) {
   console.log("BUY start:", wallet.address, "amountFixer:", amountFixer);
 
@@ -206,17 +259,16 @@ async function buyFixer(wallet, amountFixer) {
   const t1 = await pair.token1();
   console.log("PAIR tokens:", { t0, t1 });
 
-  // محاسبه مقدار USDC مورد نیاز برای گرفتن amountFixer
-  const amountInUSDC = await getAmountsOutFromPair(
+  // مقدار USDC لازم برای گرفتن amountFixer
+  const amountInUSDC = await getAmountsInFromPair(
     pair,
     amountFixer,
-    FIXER,
-    USDC
+    USDC,
+    FIXER
   );
 
   console.log("BUY → amountInUSDC:", amountInUSDC.toString());
 
-  // چک بالانس USDC
   const balanceUSDC = await usdc.balanceOf(wallet.address);
   console.log("USDC balance:", balanceUSDC.toString());
 
@@ -225,7 +277,6 @@ async function buyFixer(wallet, amountFixer) {
     throw new Error("Not enough USDC");
   }
 
-  // approve برای pair
   const allowance = await usdc.allowance(wallet.address, AERO_PAIR);
   if (allowance < amountInUSDC) {
     console.log("Approving USDC to pair...");
@@ -237,7 +288,6 @@ async function buyFixer(wallet, amountFixer) {
   let amount0Out = 0n;
   let amount1Out = 0n;
 
-  // خروجی FIXER
   if (t0.toLowerCase() === FIXER.toLowerCase()) {
     amount0Out = BigInt(amountFixer);
   } else {
@@ -258,7 +308,7 @@ async function buyFixer(wallet, amountFixer) {
   console.log("BUY tx confirmed:", tx.hash);
 }
 
-// ⭐ فروش FIXER برای USDC (ورودی = FIXER، خروجی = USDC)
+// SELL: ورودی FIXER، خروجی USDC
 async function sellFixer(wallet, amountFixer) {
   console.log("SELL start:", wallet.address, "amountFixer:", amountFixer);
 
@@ -269,7 +319,6 @@ async function sellFixer(wallet, amountFixer) {
   const t1 = await pair.token1();
   console.log("PAIR tokens:", { t0, t1 });
 
-  // چک بالانس FIXER
   const balanceFixer = await fixer.balanceOf(wallet.address);
   console.log("FIXER balance:", balanceFixer.toString());
 
@@ -278,7 +327,6 @@ async function sellFixer(wallet, amountFixer) {
     throw new Error("Not enough FIXER");
   }
 
-  // approve برای pair
   const allowance = await fixer.allowance(wallet.address, AERO_PAIR);
   if (allowance < amountFixer) {
     console.log("Approving FIXER to pair...");
@@ -287,7 +335,6 @@ async function sellFixer(wallet, amountFixer) {
     console.log("FIXER approved");
   }
 
-  // محاسبه خروجی USDC
   const amountOutUSDC = await getAmountsOutFromPair(
     pair,
     amountFixer,
@@ -317,6 +364,8 @@ async function sellFixer(wallet, amountFixer) {
   await tx.wait();
   console.log("SELL tx confirmed:", tx.hash);
 }
+
+// ---------- Main loop ----------
 
 setInterval(async () => {
   if (!botRunning) return;
@@ -399,7 +448,8 @@ setInterval(async () => {
   pointer++;
 }, 20000);
 
-// START
+// ---------- HTTP API ----------
+
 app.get("/start", (req, res) => {
   console.log("/start received");
 
@@ -412,7 +462,6 @@ app.get("/start", (req, res) => {
   res.json({ status: "started" });
 });
 
-// SAVE
 app.post("/save", (req, res) => {
   const newSettings = req.body;
   const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
@@ -426,7 +475,6 @@ app.post("/save", (req, res) => {
   res.json({ status: "saved" });
 });
 
-// STOP
 app.get("/stop", (req, res) => {
   console.log("/stop received");
   botRunning = false;
