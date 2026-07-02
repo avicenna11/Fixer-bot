@@ -30,11 +30,66 @@ const ERC20_ABI = [
   "function decimals() view returns (uint8)"
 ];
 
+// ✅ ABI درست استخر CL (خلاصه‌شده برای swap و token0/1/slot0)
 const PAIR_ABI = [
-  "function getReserves() view returns (uint112,uint112,uint32)",
-  "function token0() view returns (address)",
-  "function token1() view returns (address)",
-  "function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data)"
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+      { "indexed": false, "internalType": "int256", "name": "amount0", "type": "int256" },
+      { "indexed": false, "internalType": "int256", "name": "amount1", "type": "int256" },
+      { "indexed": false, "internalType": "uint160", "name": "sqrtPriceX96", "type": "uint160" },
+      { "indexed": false, "internalType": "uint128", "name": "liquidity", "type": "uint128" },
+      { "indexed": false, "internalType": "int24", "name": "tick", "type": "int24" }
+    ],
+    "name": "Swap",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "recipient", "type": "address" },
+      { "internalType": "bool", "name": "zeroForOne", "type": "bool" },
+      { "internalType": "int256", "name": "amountSpecified", "type": "int256" },
+      { "internalType": "uint160", "name": "sqrtPriceLimitX96", "type": "uint160" },
+      { "internalType": "bytes", "name": "data", "type": "bytes" }
+    ],
+    "name": "swap",
+    "outputs": [
+      { "internalType": "int256", "name": "amount0", "type": "int256" },
+      { "internalType": "int256", "name": "amount1", "type": "int256" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "token0",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "token1",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "slot0",
+    "outputs": [
+      { "internalType": "uint160", "name": "sqrtPriceX96", "type": "uint160" },
+      { "internalType": "int24", "name": "tick", "type": "int24" },
+      { "internalType": "uint16", "name": "observationIndex", "type": "uint16" },
+      { "internalType": "uint16", "name": "observationCardinality", "type": "uint16" },
+      { "internalType": "uint16", "name": "observationCardinalityNext", "type": "uint16" },
+      { "internalType": "bool", "name": "unlocked", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
 ];
 
 // ---------- Settings & Wallets ----------
@@ -189,68 +244,11 @@ function decideActionForWallet(w) {
   return null;
 }
 
-// ---------- AMM math ----------
+// ---------- BUY / SELL روی استخر CL ----------
 
-async function getReservesAndTokens(pair) {
-  const [r0, r1] = await pair.getReserves();
-  const t0 = await pair.token0();
-  const t1 = await pair.token1();
-  return { r0, r1, t0, t1 };
-}
-
-// amountOut = amountIn * reserveOut / reserveIn
-async function getAmountsOutFromPair(pair, amountIn, tokenIn, tokenOut) {
-  const { r0, r1, t0, t1 } = await getReservesAndTokens(pair);
-
-  let reserveIn, reserveOut;
-
-  if (tokenIn.toLowerCase() === t0.toLowerCase()) {
-    reserveIn = r0;
-    reserveOut = r1;
-  } else {
-    reserveIn = r1;
-    reserveOut = r0;
-  }
-
-  const out = (BigInt(amountIn) * BigInt(reserveOut)) / BigInt(reserveIn);
-  console.log("getAmountsOutFromPair:", {
-    amountIn: amountIn.toString(),
-    reserveIn: reserveIn.toString(),
-    reserveOut: reserveOut.toString(),
-    amountOut: out.toString()
-  });
-  return out;
-}
-
-// amountIn = amountOut * reserveIn / reserveOut
-async function getAmountsInFromPair(pair, amountOut, tokenIn, tokenOut) {
-  const { r0, r1, t0, t1 } = await getReservesAndTokens(pair);
-
-  let reserveIn, reserveOut;
-
-  if (tokenIn.toLowerCase() === t0.toLowerCase()) {
-    reserveIn = r0;
-    reserveOut = r1;
-  } else {
-    reserveIn = r1;
-    reserveOut = r0;
-  }
-
-  const amountIn = (BigInt(amountOut) * BigInt(reserveIn)) / BigInt(reserveOut);
-  console.log("getAmountsInFromPair:", {
-    amountOut: amountOut.toString(),
-    reserveIn: reserveIn.toString(),
-    reserveOut: reserveOut.toString(),
-    amountIn: amountIn.toString()
-  });
-  return amountIn;
-}
-
-// ---------- BUY / SELL ----------
-
-// BUY: ورودی USDC، خروجی FIXER
-async function buyFixer(wallet, amountFixer) {
-  console.log("BUY start:", wallet.address, "amountFixer:", amountFixer);
+// BUY: USDC → FIXER (token0 → token1) → zeroForOne = true
+async function buyFixer(wallet, amountUsdc) {
+  console.log("BUY start:", wallet.address, "amountUsdc:", amountUsdc);
 
   const pair = new ethers.Contract(AERO_PAIR, PAIR_ABI, wallet);
   const usdc = new ethers.Contract(USDC, ERC20_ABI, wallet);
@@ -259,56 +257,49 @@ async function buyFixer(wallet, amountFixer) {
   const t1 = await pair.token1();
   console.log("PAIR tokens:", { t0, t1 });
 
-  // مقدار USDC لازم برای گرفتن amountFixer
-  const amountInUSDC = await getAmountsInFromPair(
-    pair,
-    amountFixer,
-    USDC,
-    FIXER
-  );
-
-  console.log("BUY → amountInUSDC:", amountInUSDC.toString());
-
   const balanceUSDC = await usdc.balanceOf(wallet.address);
   console.log("USDC balance:", balanceUSDC.toString());
 
-  if (balanceUSDC < amountInUSDC) {
+  const amountIn = BigInt(amountUsdc);
+
+  if (balanceUSDC < amountIn) {
     console.log("❌ Not enough USDC for BUY");
     throw new Error("Not enough USDC");
   }
 
   const allowance = await usdc.allowance(wallet.address, AERO_PAIR);
-  if (allowance < amountInUSDC) {
+  if (allowance < amountIn) {
     console.log("Approving USDC to pair...");
-    const txApprove = await usdc.approve(AERO_PAIR, amountInUSDC);
+    const txApprove = await usdc.approve(AERO_PAIR, amountIn);
     await txApprove.wait();
     console.log("USDC approved");
   }
 
-  let amount0Out = 0n;
-  let amount1Out = 0n;
-
-  if (t0.toLowerCase() === FIXER.toLowerCase()) {
-    amount0Out = BigInt(amountFixer);
-  } else {
-    amount1Out = BigInt(amountFixer);
-  }
+  const zeroForOne = true;              // token0 → token1
+  const amountSpecified = amountIn;     // exact input
+  const sqrtPriceLimitX96 = 0n;         // بدون محدودیت قیمت
 
   console.log("Calling swap BUY with:", {
-    amount0Out: amount0Out.toString(),
-    amount1Out: amount1Out.toString(),
-    to: wallet.address
+    recipient: wallet.address,
+    zeroForOne,
+    amountSpecified: amountSpecified.toString(),
+    sqrtPriceLimitX96: sqrtPriceLimitX96.toString()
   });
 
-  const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", {
-    gasLimit: GAS_LIMIT
-  });
+  const tx = await pair.swap(
+    wallet.address,
+    zeroForOne,
+    amountSpecified,
+    sqrtPriceLimitX96,
+    "0x",
+    { gasLimit: GAS_LIMIT }
+  );
   console.log("BUY tx sent:", tx.hash);
   await tx.wait();
   console.log("BUY tx confirmed:", tx.hash);
 }
 
-// SELL: ورودی FIXER، خروجی USDC
+// SELL: FIXER → USDC (token1 → token0) → zeroForOne = false
 async function sellFixer(wallet, amountFixer) {
   console.log("SELL start:", wallet.address, "amountFixer:", amountFixer);
 
@@ -322,44 +313,40 @@ async function sellFixer(wallet, amountFixer) {
   const balanceFixer = await fixer.balanceOf(wallet.address);
   console.log("FIXER balance:", balanceFixer.toString());
 
-  if (balanceFixer < amountFixer) {
+  const amountIn = BigInt(amountFixer);
+
+  if (balanceFixer < amountIn) {
     console.log("❌ Not enough FIXER for SELL");
     throw new Error("Not enough FIXER");
   }
 
   const allowance = await fixer.allowance(wallet.address, AERO_PAIR);
-  if (allowance < amountFixer) {
+  if (allowance < amountIn) {
     console.log("Approving FIXER to pair...");
-    const txApprove = await fixer.approve(AERO_PAIR, amountFixer);
+    const txApprove = await fixer.approve(AERO_PAIR, amountIn);
     await txApprove.wait();
     console.log("FIXER approved");
   }
 
-  const amountOutUSDC = await getAmountsOutFromPair(
-    pair,
-    amountFixer,
-    FIXER,
-    USDC
-  );
-
-  let amount0Out = 0n;
-  let amount1Out = 0n;
-
-  if (t0.toLowerCase() === USDC.toLowerCase()) {
-    amount0Out = BigInt(amountOutUSDC);
-  } else {
-    amount1Out = BigInt(amountOutUSDC);
-  }
+  const zeroForOne = false;             // token1 → token0
+  const amountSpecified = amountIn;
+  const sqrtPriceLimitX96 = 0n;
 
   console.log("Calling swap SELL with:", {
-    amount0Out: amount0Out.toString(),
-    amount1Out: amount1Out.toString(),
-    to: wallet.address
+    recipient: wallet.address,
+    zeroForOne,
+    amountSpecified: amountSpecified.toString(),
+    sqrtPriceLimitX96: sqrtPriceLimitX96.toString()
   });
 
-  const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", {
-    gasLimit: GAS_LIMIT
-  });
+  const tx = await pair.swap(
+    wallet.address,
+    zeroForOne,
+    amountSpecified,
+    sqrtPriceLimitX96,
+    "0x",
+    { gasLimit: GAS_LIMIT }
+  );
   console.log("SELL tx sent:", tx.hash);
   await tx.wait();
   console.log("SELL tx confirmed:", tx.hash);
