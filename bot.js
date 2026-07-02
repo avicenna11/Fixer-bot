@@ -21,6 +21,15 @@ const AERO_PAIR = "0x5503D7B01A36B434A9Da15A742aB0649f367A0C5";
 const MAX_GAS_ETH = 0.00002;
 const GAS_LIMIT = 180000n;
 
+const ERC20_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function transferFrom(address from, address to, uint256 amount) returns (bool)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function decimals() view returns (uint8)"
+];
+
 function loadSettings() {
   return JSON.parse(fs.readFileSync("settings.json"));
 }
@@ -186,17 +195,49 @@ async function getAmountsOutFromPair(pair, amountIn, tokenIn, tokenOut) {
   return out;
 }
 
+// ⭐ خرید FIXER با USDC (ورودی = USDC، خروجی = FIXER)
 async function buyFixer(wallet, amountFixer) {
   console.log("BUY start:", wallet.address, "amountFixer:", amountFixer);
+
   const pair = new ethers.Contract(AERO_PAIR, PAIR_ABI, wallet);
+  const usdc = new ethers.Contract(USDC, ERC20_ABI, wallet);
 
   const t0 = await pair.token0();
   const t1 = await pair.token1();
   console.log("PAIR tokens:", { t0, t1 });
 
+  // محاسبه مقدار USDC مورد نیاز برای گرفتن amountFixer
+  const amountInUSDC = await getAmountsOutFromPair(
+    pair,
+    amountFixer,
+    FIXER,
+    USDC
+  );
+
+  console.log("BUY → amountInUSDC:", amountInUSDC.toString());
+
+  // چک بالانس USDC
+  const balanceUSDC = await usdc.balanceOf(wallet.address);
+  console.log("USDC balance:", balanceUSDC.toString());
+
+  if (balanceUSDC < amountInUSDC) {
+    console.log("❌ Not enough USDC for BUY");
+    throw new Error("Not enough USDC");
+  }
+
+  // approve برای pair
+  const allowance = await usdc.allowance(wallet.address, AERO_PAIR);
+  if (allowance < amountInUSDC) {
+    console.log("Approving USDC to pair...");
+    const txApprove = await usdc.approve(AERO_PAIR, amountInUSDC);
+    await txApprove.wait();
+    console.log("USDC approved");
+  }
+
   let amount0Out = 0n;
   let amount1Out = 0n;
 
+  // خروجی FIXER
   if (t0.toLowerCase() === FIXER.toLowerCase()) {
     amount0Out = BigInt(amountFixer);
   } else {
@@ -209,21 +250,50 @@ async function buyFixer(wallet, amountFixer) {
     to: wallet.address
   });
 
-  const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", { gasLimit: GAS_LIMIT });
+  const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", {
+    gasLimit: GAS_LIMIT
+  });
   console.log("BUY tx sent:", tx.hash);
   await tx.wait();
   console.log("BUY tx confirmed:", tx.hash);
 }
 
+// ⭐ فروش FIXER برای USDC (ورودی = FIXER، خروجی = USDC)
 async function sellFixer(wallet, amountFixer) {
   console.log("SELL start:", wallet.address, "amountFixer:", amountFixer);
-  const pair = new ethers.Contract(AERO_PAIR, PAIR_ABI, wallet);
 
-  const amountOutUSDC = await getAmountsOutFromPair(pair, amountFixer, FIXER, USDC);
+  const pair = new ethers.Contract(AERO_PAIR, PAIR_ABI, wallet);
+  const fixer = new ethers.Contract(FIXER, ERC20_ABI, wallet);
 
   const t0 = await pair.token0();
   const t1 = await pair.token1();
   console.log("PAIR tokens:", { t0, t1 });
+
+  // چک بالانس FIXER
+  const balanceFixer = await fixer.balanceOf(wallet.address);
+  console.log("FIXER balance:", balanceFixer.toString());
+
+  if (balanceFixer < amountFixer) {
+    console.log("❌ Not enough FIXER for SELL");
+    throw new Error("Not enough FIXER");
+  }
+
+  // approve برای pair
+  const allowance = await fixer.allowance(wallet.address, AERO_PAIR);
+  if (allowance < amountFixer) {
+    console.log("Approving FIXER to pair...");
+    const txApprove = await fixer.approve(AERO_PAIR, amountFixer);
+    await txApprove.wait();
+    console.log("FIXER approved");
+  }
+
+  // محاسبه خروجی USDC
+  const amountOutUSDC = await getAmountsOutFromPair(
+    pair,
+    amountFixer,
+    FIXER,
+    USDC
+  );
 
   let amount0Out = 0n;
   let amount1Out = 0n;
@@ -240,7 +310,9 @@ async function sellFixer(wallet, amountFixer) {
     to: wallet.address
   });
 
-  const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", { gasLimit: GAS_LIMIT });
+  const tx = await pair.swap(amount0Out, amount1Out, wallet.address, "0x", {
+    gasLimit: GAS_LIMIT
+  });
   console.log("SELL tx sent:", tx.hash);
   await tx.wait();
   console.log("SELL tx confirmed:", tx.hash);
@@ -264,7 +336,14 @@ setInterval(async () => {
     return;
   }
 
-  console.log("Tick at", new Date(now).toISOString(), "→ pointer", pointer, "nextTime", new Date(nextTime).toISOString());
+  console.log(
+    "Tick at",
+    new Date(now).toISOString(),
+    "→ pointer",
+    pointer,
+    "nextTime",
+    new Date(nextTime).toISOString()
+  );
 
   const gasOK = await isGasCheapEnough();
   if (!gasOK) {
@@ -318,10 +397,9 @@ setInterval(async () => {
   }
 
   pointer++;
-
 }, 20000);
 
-// ⭐ نسخهٔ اصلاح‌شدهٔ START
+// START
 app.get("/start", (req, res) => {
   console.log("/start received");
 
@@ -334,7 +412,7 @@ app.get("/start", (req, res) => {
   res.json({ status: "started" });
 });
 
-// ⭐ نسخهٔ اصلاح‌شدهٔ SAVE
+// SAVE
 app.post("/save", (req, res) => {
   const newSettings = req.body;
   const oldSettings = JSON.parse(fs.readFileSync("settings.json"));
@@ -348,6 +426,7 @@ app.post("/save", (req, res) => {
   res.json({ status: "saved" });
 });
 
+// STOP
 app.get("/stop", (req, res) => {
   console.log("/stop received");
   botRunning = false;
